@@ -1,28 +1,35 @@
-var webpackConfig = require('../webpack.config.dev')
-webpackConfig.devtool = 'inline-source-map'
+import webpackConfig from '../webpack.config.babel'
 
-module.exports = function (config) {
+export default function (config) {
   config.set({
-    browsers: process.env.TRAVIS ? [ 'ChromeTravis' ] : [ 'Chrome', 'Firefox' ],
+    browsers: [process.env.TRAVIS ? 'ChromeTravis' : 'Chrome'],
     singleRun: true,
-    frameworks: [ 'mocha', 'chai' ],
-    files: [
-      'karma.webpack.js'
-    ],
+    frameworks: ['mocha', 'chai'],
+    files: ['karma.webpack.js'],
     preprocessors: {
-      'karma.webpack.js': [ 'webpack', 'sourcemap' ]
+      'karma.webpack.js': ['webpack', 'sourcemap']
     },
-    reporters: [ 'mocha' ],
-    webpack: webpackConfig,
+    reporters: ['mocha', 'coverage'],
+    webpack: {
+      ...webpackConfig,
+      devtool: 'inline-source-map'
+    },
     webpackServer: {
       noInfo: true
     },
     client: {
       mocha: {
-        timeout: 60000
+        timeout: 60000,
+        retries: 9
       }
     },
     browserNoActivityTimeout: 60000,
+    coverageReporter: {
+      dir: 'coverage',
+      reporters: [
+        { type: 'lcov', subdir: '.' }
+      ]
+    },
     customLaunchers: {
       ChromeTravis: {
         base: 'Chrome',
