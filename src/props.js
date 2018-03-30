@@ -8,39 +8,50 @@ export const propTypes = {
   loop: bool,
   controls: bool,
   volume: number,
+  muted: bool,
   playbackRate: number,
   width: oneOfType([ string, number ]),
   height: oneOfType([ string, number ]),
   style: object,
-  progressFrequency: number,
+  progressInterval: number,
   playsinline: bool,
-  soundcloudConfig: shape({
-    clientId: string,
-    showArtwork: bool
-  }),
-  youtubeConfig: shape({
-    playerVars: object,
-    preload: bool
-  }),
-  facebookConfig: shape({
-    appId: string
-  }),
-  dailymotionConfig: shape({
-    params: object,
-    preload: bool
-  }),
-  vimeoConfig: shape({
-    iframeParams: object,
-    preload: bool
-  }),
-  vidmeConfig: shape({
-    format: string
-  }),
-  fileConfig: shape({
-    attributes: object,
-    forceAudio: bool,
-    forceHLS: bool,
-    forceDASH: bool
+  wrapper: oneOfType([ string, func ]),
+  config: shape({
+    soundcloud: shape({
+      options: object
+    }),
+    youtube: shape({
+      playerVars: object,
+      preload: bool
+    }),
+    facebook: shape({
+      appId: string
+    }),
+    dailymotion: shape({
+      params: object,
+      preload: bool
+    }),
+    vimeo: shape({
+      iframeParams: object,
+      preload: bool
+    }),
+    file: shape({
+      attributes: object,
+      tracks: array,
+      forceAudio: bool,
+      forceHLS: bool,
+      forceDASH: bool,
+      hlsOptions: object
+    }),
+    wistia: shape({
+      options: object
+    }),
+    mixcloud: shape({
+      options: object
+    }),
+    twitch: shape({
+      options: object
+    })
   }),
   onReady: func,
   onStart: func,
@@ -50,6 +61,7 @@ export const propTypes = {
   onEnded: func,
   onError: func,
   onDuration: func,
+  onSeek: func,
   onProgress: func
 }
 
@@ -57,40 +69,77 @@ export const defaultProps = {
   playing: false,
   loop: false,
   controls: false,
-  volume: 0.8,
+  volume: null,
+  muted: false,
   playbackRate: 1,
-  width: 640,
-  height: 360,
-  hidden: false,
-  progressFrequency: 1000,
+  width: '640px',
+  height: '360px',
+  style: {},
+  progressInterval: 1000,
   playsinline: false,
-  soundcloudConfig: {
-    clientId: 'e8b6f84fbcad14c301ca1355cae1dea2',
-    showArtwork: true
-  },
-  youtubeConfig: {
-    playerVars: {},
-    preload: false
-  },
-  facebookConfig: {
-    appId: '1309697205772819'
-  },
-  dailymotionConfig: {
-    params: {},
-    preload: false
-  },
-  vimeoConfig: {
-    iframeParams: {},
-    preload: false
-  },
-  vidmeConfig: {
-    format: null
-  },
-  fileConfig: {
-    attributes: {},
-    forceAudio: false,
-    forceHLS: false,
-    forceDASH: false
+  wrapper: 'div',
+  config: {
+    soundcloud: {
+      options: {
+        visual: true, // Undocumented, but makes player fill container and look better
+        buying: false,
+        liking: false,
+        download: false,
+        sharing: false,
+        show_comments: false,
+        show_playcount: false
+      }
+    },
+    youtube: {
+      playerVars: {
+        autoplay: 0,
+        playsinline: 1,
+        showinfo: 0,
+        rel: 0,
+        iv_load_policy: 3,
+        modestbranding: 1
+      },
+      preload: false
+    },
+    facebook: {
+      appId: '1309697205772819'
+    },
+    dailymotion: {
+      params: {
+        api: 1,
+        'endscreen-enable': false
+      },
+      preload: false
+    },
+    vimeo: {
+      playerOptions: {
+        autopause: false,
+        autoplay: false,
+        byline: false,
+        portrait: false,
+        title: false
+      },
+      preload: false
+    },
+    file: {
+      attributes: {},
+      tracks: [],
+      forceAudio: false,
+      forceHLS: false,
+      forceDASH: false,
+      hlsOptions: {}
+    },
+    wistia: {
+      options: {}
+    },
+    mixcloud: {
+      options: {
+        hide_cover: 1
+      }
+    },
+    twitch: {
+      options: {}
+    }
   },
   onReady: function () {},
   onStart: function () {},
@@ -100,5 +149,16 @@ export const defaultProps = {
   onEnded: function () {},
   onError: function () {},
   onDuration: function () {},
+  onSeek: function () {},
   onProgress: function () {}
 }
+
+export const DEPRECATED_CONFIG_PROPS = [
+  'soundcloudConfig',
+  'youtubeConfig',
+  'facebookConfig',
+  'dailymotionConfig',
+  'vimeoConfig',
+  'fileConfig',
+  'wistiaConfig'
+]

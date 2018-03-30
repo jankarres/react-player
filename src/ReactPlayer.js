@@ -1,42 +1,38 @@
 import React, { Component } from 'react'
-import omit from 'lodash.omit'
 
-import { propTypes, defaultProps } from './props'
-import YouTube from './players/YouTube'
-import SoundCloud from './players/SoundCloud'
-import Vimeo from './players/Vimeo'
-import Facebook from './players/Facebook'
-import FilePlayer from './players/FilePlayer'
-import Streamable from './players/Streamable'
-import Vidme from './players/Vidme'
-import Wistia from './players/Wistia'
-import DailyMotion from './players/DailyMotion'
+import { propTypes, defaultProps, DEPRECATED_CONFIG_PROPS } from './props'
+import { getConfig, omit, isEqual } from './utils'
+import players from './players'
+import Player from './Player'
+import { FilePlayer } from './players/FilePlayer'
+import renderPreloadPlayers from './preload'
+
+const SUPPORTED_PROPS = Object.keys(propTypes)
 
 export default class ReactPlayer extends Component {
   static displayName = 'ReactPlayer'
   static propTypes = propTypes
   static defaultProps = defaultProps
-  componentDidMount () {
-    this.progress()
+  static canPlay = url => {
+    for (let Player of players) {
+      if (Player.canPlay(url)) {
+        return true
+      }
+    }
+    return false
   }
-  componentWillUnmount () {
-    clearTimeout(this.progressTimeout)
+  config = getConfig(this.props, defaultProps, true)
+  componentDidMount () {
+    if (this.props.progressFrequency) {
+      const message = 'ReactPlayer: %cprogressFrequency%c is deprecated, please use %cprogressInterval%c instead'
+      console.warn(message, 'font-weight: bold', '', 'font-weight: bold', '')
+    }
   }
   shouldComponentUpdate (nextProps) {
-    return (
-      this.props.url !== nextProps.url ||
-      this.props.playing !== nextProps.playing ||
-      this.props.volume !== nextProps.volume ||
-      this.props.playbackRate !== nextProps.playbackRate ||
-      this.props.height !== nextProps.height ||
-      this.props.width !== nextProps.width ||
-      this.props.hidden !== nextProps.hidden
-    )
+    return !isEqual(this.props, nextProps)
   }
-  seekTo = fraction => {
-    if (this.player) {
-      this.player.seekTo(fraction)
-    }
+  componentWillUpdate (nextProps) {
+    this.config = getConfig(nextProps, defaultProps)
   }
   getDuration = () => {
     if (!this.player) return null
@@ -44,102 +40,61 @@ export default class ReactPlayer extends Component {
   }
   getCurrentTime = () => {
     if (!this.player) return null
-    const duration = this.player.getDuration()
-    const fractionPlayed = this.player.getFractionPlayed()
-    if (duration === null || fractionPlayed === null) {
-      return null
-    }
-    return fractionPlayed * duration
+    return this.player.getCurrentTime()
   }
-  progress = () => {
-    if (this.props.url && this.player) {
-      const loaded = this.player.getFractionLoaded() || 0
-      const played = this.player.getFractionPlayed() || 0
-      const duration = this.player.getDuration()
-      const progress = {}
-      if (loaded !== this.prevLoaded) {
-        progress.loaded = loaded
-        if (duration) {
-          progress.loadedSeconds = progress.loaded * duration
-        }
-      }
-      if (played !== this.prevPlayed) {
-        progress.played = played
-        if (duration) {
-          progress.playedSeconds = progress.played * duration
-        }
-      }
-      if (progress.loaded || progress.played) {
-        this.props.onProgress(progress)
-      }
-      this.prevLoaded = loaded
-      this.prevPlayed = played
-    }
-    this.progressTimeout = setTimeout(this.progress, this.props.progressFrequency)
+  getInternalPlayer = (key = 'player') => {
+    if (!this.player) return null
+    return this.player.getInternalPlayer(key)
   }
-  renderPlayers () {
-    // Build array of players to render based on URL and preload config
-    const { url, youtubeConfig, vimeoConfig, dailymotionConfig } = this.props
-    const players = []
-    if (YouTube.canPlay(url)) {
-      players.push(YouTube)
-    } else if (SoundCloud.canPlay(url)) {
-      players.push(SoundCloud)
-    } else if (Vimeo.canPlay(url)) {
-      players.push(Vimeo)
-    } else if (Facebook.canPlay(url)) {
-      players.push(Facebook)
-    } else if (DailyMotion.canPlay(url)) {
-      players.push(DailyMotion)
-    } else if (Streamable.canPlay(url)) {
-      players.push(Streamable)
-    } else if (Vidme.canPlay(url)) {
-      players.push(Vidme)
-    } else if (Wistia.canPlay(url)) {
-      players.push(Wistia)
-    } else if (url) {
-      // Fall back to FilePlayer if nothing else can play the URL
-      players.push(FilePlayer)
-    }
-    // Render additional players if preload config is set
-    if (!YouTube.canPlay(url) && youtubeConfig.preload) {
-      players.push(YouTube)
-    }
-    if (!Vimeo.canPlay(url) && vimeoConfig.preload) {
-      players.push(Vimeo)
-    }
-    if (!DailyMotion.canPlay(url) && dailymotionConfig.preload) {
-      players.push(DailyMotion)
-    }
-    return players.map(this.renderPlayer)
+  seekTo = fraction => {
+    if (!this.player) return null
+    this.player.seekTo(fraction)
   }
-  ref = player => {
+  getActivePlayer (url) {
+    for (let Player of players) {
+      if (Player.canPlay(url)) {
+        return Player
+      }
+    }
+    // Fall back to FilePlayer if nothing else can play the URL
+    return FilePlayer
+  }
+  wrapperRef = wrapper => {
+    this.wrapper = wrapper
+  }
+  activePlayerRef = player => {
     this.player = player
   }
-  renderPlayer = Player => {
-    const active = Player.canPlay(this.props.url)
-    const { youtubeConfig, vimeoConfig, dailymotionConfig, ...activeProps } = this.props
-    const props = active ? { ...activeProps, ref: this.ref } : {}
-    // Only youtube and vimeo config passed to
-    // inactive players due to preload behaviour
+  renderActivePlayer (url) {
+    if (!url) return null
+    const activePlayer = this.getActivePlayer(url)
     return (
       <Player
-        key={Player.displayName}
-        youtubeConfig={youtubeConfig}
-        vimeoConfig={vimeoConfig}
-        dailymotionConfig={dailymotionConfig}
-        {...props}
+        {...this.props}
+        key={activePlayer.displayName}
+        ref={this.activePlayerRef}
+        config={this.config}
+        activePlayer={activePlayer}
       />
     )
   }
+  sortPlayers (a, b) {
+    // Retain player order to prevent weird iframe behaviour when switching players
+    if (a && b) {
+      return a.key < b.key ? -1 : 1
+    }
+    return 0
+  }
   render () {
-    const { style, width, height } = this.props
-    const otherProps = omit(this.props, Object.keys(propTypes))
-    const players = this.renderPlayers()
+    const { url, style, width, height, wrapper: Wrapper } = this.props
+    const otherProps = omit(this.props, SUPPORTED_PROPS, DEPRECATED_CONFIG_PROPS)
+    const activePlayer = this.renderActivePlayer(url)
+    const preloadPlayers = renderPreloadPlayers(url, this.config)
+    const players = [ activePlayer, ...preloadPlayers ].sort(this.sortPlayers)
     return (
-      <div style={{ ...style, width, height }} {...otherProps}>
+      <Wrapper ref={this.wrapperRef} style={{ ...style, width, height }} {...otherProps}>
         {players}
-      </div>
+      </Wrapper>
     )
   }
 }
